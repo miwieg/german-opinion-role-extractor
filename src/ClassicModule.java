@@ -238,11 +238,20 @@ public class ClassicModule implements Module {
               Fenode targetNode = new Fenode(targetId);
               target.addFenode(targetNode);
 
+              // NEW
+			  boolean passedQuickFix = true;
+			  			  
               // In case of mwe: add all collocations to the sentimentexpression
               // xml/frame
               if (utmp.typ.equals("mwe")) {
                 ArrayList<WordObj> matches = graph.getMweMatches(wtmp,
                         new ArrayList<String>(Arrays.asList(utmp.collocations)), true);
+                
+                //NEW
+				if(!(isMWEWellformed(matches,graph))){
+					passedQuickFix = false;
+				}
+				
                 Id targetIdMWE;
                 Fenode targetNodeMWE;
                 for (WordObj match : matches) {
@@ -271,8 +280,12 @@ public class ClassicModule implements Module {
               if (findTargets) {
                 setTargets(utmp, graph, wtmp, containsDeleted, fecount, idstr, sentence, tree, sentFrame);
               }
-              // System.out.println(sentFrame.toString());
-              sentFrames.add(sentFrame);
+              
+            //NEW
+			if(passedQuickFix){
+				sentFrames.add(sentFrame);
+			}
+				
               lemma = lemma + "+";
             }
           } // END for wordAndLemma
@@ -308,6 +321,132 @@ public class ClassicModule implements Module {
     return sentFrames;
   }
 
+	/**
+	 * This method is a quick-fix-method to correctly match MWEs being
+	 * either light verb constructions (LVCs) or reflexive verbs (RVs):;
+	 * the actual MWE matching is very flexible with matching tokens in
+	 * a sentence; for LVCs and RVs this often results in false positive;
+	 * this method tries to detect these false positives;
+	 * For LVC: the noun must be an accusative object (obja) of the light verb.
+	 * For RVs: we check whether a pronoun is actually a reflexive pronoun.
+	 * 
+	 * @param matches words comprising an MWE that are to be checked for well-formedness
+	 * @param graph dependency gram
+	 * 
+	 * @return boolean value confirming or rejecting well-formedness
+	 */
+	
+	private boolean isMWEWellformed(List<WordObj> matches,DependencyGraph graph){
+		boolean isWellFormed = true;
+
+		//if((matches.size()==2)||(matches.size()==3)){
+		if((matches.size()==2)||((matches.size()==3) && isOneTokenIsParticle(matches))){
+			// is there is a MWE with a light verb
+			// one other token of the MWE must be its accusative object
+			// i.e. "obja"
+			WordObj lv = getLightVerbTokenFromList(matches);
+//			for(WordObj match:matches){
+//				System.out.println("WO: " + match);
+//			}
+			if(lv != null){
+				
+
+				
+				isWellFormed = false;
+				for(WordObj match:matches){
+					if(!(match.getLemma().equals(lv.getLemma()))){
+						for(Edge edge:graph.getEdges()){
+							if(edge.source.getName().equals(lv.getName()) &&
+									edge.target.getName().equals(match.getName())){
+								String relation = edge.depRel;
+								if(relation.equals("obja")){
+									isWellFormed = true;
+									break;
+								}
+							}
+						}
+					}
+				}
+				
+
+			}
+			
+			// if one token is a pronoun, it must also be a reflexive pronoun;
+			// currently the matching procedure also allows other personal pronouns
+			// which overgenerates MWEs
+			boolean sawPRF = false;
+			boolean sawOtherPersonalPron = false;
+			for(WordObj match:matches){
+				if(match.getPos().equals("PPER")){
+					sawOtherPersonalPron = true;
+					//System.out.println("HERE");
+				} else if(match.getPos().equals("PRF")){
+					sawPRF = true;
+				}
+			}
+			
+			if(sawOtherPersonalPron && !sawPRF){
+//				System.out.println("malformed reflexive");
+//				System.out.println();
+				isWellFormed = false;
+			} else {
+//				System.out.println("wellformed reflexive");
+//				System.out.println();
+			}
+			
+		}
+
+		return isWellFormed;
+	}
+	
+	
+	/***
+	 * Checks whether a list of words contains a particle
+	 * 
+	 * @param the list of words to be inspected for containing a particle
+	 * 
+	 * @return boolean value confirming or rejecting the presence of a particle
+	 */
+	private boolean isOneTokenIsParticle(List<WordObj> matches){
+		boolean isParticle = false;
+		
+		for(WordObj match:matches){
+			if(match.getPos().equals("PTKVZ")){
+				isParticle = true;
+				break;
+			}
+		}
+		
+		return isParticle;
+	}
+	
+	
+	/***
+	 * Checks whether a list of words contains a light verb;
+	 * the list of light verbs is hard encoded in this method
+	 * 
+	 * @param the list of words to be inspected to be a light verb
+	 * 
+	 * @return the word object representing the light verb; if no such verb could be found
+	 * {@code null} is returned
+	 */
+	private WordObj getLightVerbTokenFromList(List<WordObj> matches){
+		WordObj lv = null;
+		for(WordObj match:matches){
+			if(match.getLemma().equals("haben")||match.getLemma().equals("machen")||
+					match.getLemma().equals("bringen")||match.getLemma().equals("geben")||
+					match.getLemma().equals("nehmen")||match.getLemma().equals("bekommen")||
+					match.getLemma().equals("finden")||match.getLemma().equals("kommen")){
+				lv = match;
+				break;
+			}
+		}
+		return lv;
+	}
+
+
+  
+  
   /**
    * Used in {@link #findFrames(SentenceObj)} to add FrameElements for every
    * target.
@@ -353,6 +492,21 @@ public class ClassicModule implements Module {
             FrameElement sourceFe = new FrameElement(feId, "Target");
             Id feNodeId = new Id(sentence.id.getId() + "_" + tmpword.getPosition());
             Object obj = tree.getArgumentNode(wtmp, tmpword, null);
+            
+          //NEW BLOCK:
+			if(utmp.typ.equals("mwe")){
+				ArrayList<String> mweWords = new ArrayList<>();
+			    for (String word : utmp.collocations) {
+			      mweWords.add(word);
+			    }
+				List<WordObj> allPredicateTokens = graph.getMweMatches(wtmp,mweWords, false);
+//				for(WordObj wo:allPredicateTokens){
+//					System.out.println("WO(1): " + wo.getName());
+//				}
+				System.out.println();
+				obj = tree.getArgumentNodeMWE(wtmp,tmpword,allPredicateTokens);
+			}
+			
             if (obj instanceof Terminal) {
               feNodeId = ((Terminal) obj).getId();
             }

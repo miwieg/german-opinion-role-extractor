@@ -310,13 +310,23 @@ public class PresetSELocationModule implements Module {
                   List<WordObj> targetlist = graph.getSentimentSourceTargetMWE(
                           word, newSentiment, targetz, word.getDeleted().peekFirst());
 
+//                  for(WordObj tgt:targetlist){
+//                      System.out.println("Sentence: "+ sentence.id);
+//                      System.out.println("Pred: " + wordStr);
+//                      System.out.println("Target: " + tgt.getLemma());
+//                      System.out.println();
+//                  }
+                  
                   for (WordObj tmpword : targetlist) {
                     if (mweMatches.contains(tmpword)) {
+                    	found = false;
                       continue;
                     }
                     if (!tmpword.getPos().equals("PRF")) {
                       fecount = setTarget(fecount, idstr, sentence, tmpword,
                               tree, word, frame);
+                    } else {
+                    	found = false;
                     }
                   }
                   //Stop looking for targets after one has been found.
@@ -328,6 +338,9 @@ public class PresetSELocationModule implements Module {
               }
             }
           }
+      
+
+          
           frame.setTarget(target);
           frames.add(frame);
           continue;
@@ -563,7 +576,7 @@ public class PresetSELocationModule implements Module {
   }
 
   /**
-   * Get default rules for source candidates as a list of dependeny relations.
+   * Get default rules for source candidates as a list of dependency relations.
    *
    * @param toAnalyse The sentenceObj representing the current sentence.
    * @param posSubjExpr The POS-Tag of the current SE-word.
@@ -597,7 +610,7 @@ public class PresetSELocationModule implements Module {
   }
 
   /**
-   * Get default rules for target candidates as a list of dependeny relations.
+   * Get default rules for target candidates as a list of dependency relations.
    *
    * @param toAnalyse The sentenceObj representing the current sentence.
    * @param posSubjExpr The POS-Tag of the current SE-word.

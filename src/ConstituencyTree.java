@@ -543,6 +543,72 @@ public class ConstituencyTree {
 	}
 
 	/**
+	 * This method is for the extraction of phrases for MWE-predicates
+	 * Given an argument and an MWE-predicate in a {@link ConstituencyTree}, we want to return a node which
+	 * a) either dominates the argument node or is the argument node
+	 * b) is dominated by the node which dominates both the MWE-predicate and argument node
+	 * c) the node must NOT dominate any token of the MWE-predicate
+	 *
+	 * @param predicate The predicate represented by a {@link WordObj}.
+	 * @param argument The argument represented by a {@link WordObj}.
+	 * @param depGraph Graph used to retrieve the word list.
+	 * @param allPredicateTokens All tokens part of the MWE-predicate represented by by a {@link List<WordObj>}.
+	 * @return The node which is dominated directly by the lowest node in the tree dominating both the predicate and the argument node.
+	 */
+	public Object getArgumentNodeMWE(WordObj predicate, WordObj argument, List<WordObj> allPredicateTokens){
+
+		Terminal predicateNode = getTerminal(predicate);
+		Terminal argumentNode = getTerminal(argument);
+
+		// for arguments which are relative pronouns with the syntactical function of subject or direct object, return the node of the argument itself
+		if ((argument.getRelation().equals("subj") || argument.getRelation().equals("dobj")) && argument.getPos().equals("PRELS")){
+			return argumentNode;
+		}
+
+		Nonterminal parentNode = getParent(predicateNode);
+
+		// ascend the tree from the predicate node until a node is found which also dominates the argument node.
+		while (!(dominates(parentNode, predicateNode) && dominates(parentNode, argumentNode))){
+			parentNode = getParent(parentNode);
+		}
+
+		// preliminary phrase (if further operations fail; use this node!)
+		Object phrase = descendTree(parentNode, argumentNode, 1);
+
+		// get all terminal nodes representing the the tokens of the MWE-predicate
+		List<Terminal> candidates = computeExactTerminalCandidates(allPredicateTokens);
+//		for(Terminal c:candidates){
+//			System.out.println("TERMINAL: " + c.getLemma() + " (" + c.toString() + ")");
+//		}
+//		System.out.println();
+
+		// descend the tree as long as tokens of the MWE-predicate are part of the phrase
+		while (containsTerminal(phrase, candidates)){
+			phrase = descendTree((Nonterminal) phrase, argumentNode, 1);
+		}
+
+		return phrase;
+	}
+
+	/**
+	 * Computes all leafs (terminal nodes) in the constituency tree that correspond
+	 * to a set of tokens from the dependency graph
+	 *
+	 * @param List<WordObj> object representing the tokens
+	 *
+	 * @return A list of all terminal nodes representing the predicateTokens
+	 */
+	private List<Terminal> computeExactTerminalCandidates(List<WordObj> tokens) {
+		List<Terminal> candidates = new ArrayList<>();
+
+		for(WordObj predicateToken:tokens){
+			candidates.add(getTerminal(predicateToken));
+		}
+
+		return candidates;
+	}
+	
+	/**
 	 * Computes all leafs (terminal nodes) in the constituency tree that have a
 	 * corresponding word object with the same POS-tag as the given 'predicate'
 	 * word object.

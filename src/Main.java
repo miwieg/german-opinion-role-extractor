@@ -31,6 +31,7 @@ public class Main {
     ConfigReader conReader;
     if (args.length >= 1) {
       System.out.println("Reading configurations from" + args[0] + "...");
+
       conReader = new ConfigReader(args[0]);
     } else {
       //Read default configurations from config.txt.
