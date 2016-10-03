@@ -3,13 +3,13 @@ from German Text
 
 RUN 
 =====
-For running the program, the Main class of the programme has to be executed.
+For running the program, the Main class of the program has to be executed.
 Via the unix command line, this can be achieved in the following way (the current directory has to be the directory where the System folder is saved).
 
 % cd bin
 % java -cp .:<path-to-germanetapi-jar> Main <path-to-configuration-file>
 
-The location of the Germanet API is given below.
+The location of the GermaNet API is given below.
 
 Java Runtime 1.5 or higher should be used.
 In the above case, if no path to the configuration file is specified, the default configuration file will be used.
